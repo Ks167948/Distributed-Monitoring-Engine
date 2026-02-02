@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package monitor;
+
+// This is the message the C++ agent will send
+message MetricReport {
+    string host_name = 1;     // Name of the computer being monitored
+    double cpu_usage = 2;     // CPU percentage (0.0 to 100.0)
+    double mem_usage = 3;     // RAM percentage
+    int64 timestamp = 4;      // Current time in milliseconds
+}
+
+// This is the message the Node.js server sends back as a "Receipt"
+message Ack {
+    string status = 1;        // "Success" or "Error"
+}
+
+// This defines the "Phone Call" between the two programs
+service MonitorService {
+    // A client-to-server stream: The agent keeps pushing data
+    rpc StreamMetrics(stream MetricReport) returns (Ack);
+}

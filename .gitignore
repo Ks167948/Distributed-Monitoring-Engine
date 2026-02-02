@@ -1,0 +1,14 @@
+# Compiled binaries
+agent
+*.o
+
+# Generated gRPC files (GitHub doesn't need these; others can run 'make')
+*.pb.cc
+*.pb.h
+
+# Node.js dependencies
+node_modules/
+package-lock.json
+
+# WSL/OS junk
+.DS_Store
