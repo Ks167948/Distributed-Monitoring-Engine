@@ -1,40 +1,54 @@
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
+const redis = require('redis');
 
-// 1. Load the "Contract" (.proto file)
+// 1. Connect to Redis
+const redisClient = redis.createClient();
+redisClient.connect().then(() => console.log("Connected to Redis database!"));
+
 const packageDefinition = protoLoader.loadSync('monitor.proto', {});
 const monitorProto = grpc.loadPackageDefinition(packageDefinition).monitor;
 
-// 2. Define what happens when an Agent sends data
-function streamMetrics(call, callback) {
-    console.log("Agent connected! Receiving data stream...");
+async function streamMetrics(call, callback) {
+    console.log(">>> [NETWORK] Agent has connected to the stream.");
 
-    // This 'call' object is a readable stream
-    call.on('data', (report) => {
-        console.log(`[${report.host_name}] CPU: ${report.cpu_usage.toFixed(2)}% | RAM: ${report.mem_usage.toFixed(2)}%`);
+    call.on('data', async (report) => {
+        // FIX: Ensure we get a string even if host_name is missing or renamed
+        const host = report.host_name || report.hostname || "Unknown-Host";
+        
+        console.log(`>>> [RECEIVE] Got packet from: ${host}`);
+        
+        try {
+            const dataPoint = JSON.stringify({
+                cpu: report.cpu_usage,
+                mem: report.mem_usage,
+                time: new Date().toISOString()
+            });
+
+            // Save to Redis using the resolved host variable
+            const listSize = await redisClient.lPush(`metrics:${host}`, dataPoint);
+            console.log(`>>> [REDIS] Successfully saved. Total entries for ${host}: ${listSize}`);
+            
+            await redisClient.lTrim(`metrics:${host}`, 0, 49);
+        } catch (err) {
+            console.error("!!! [REDIS ERROR]:", err);
+        }
     });
 
     call.on('end', () => {
-        // Send back a "Receipt" when the agent finishes
+        console.log(">>> [NETWORK] Agent finished streaming.");
         callback(null, { status: "Success" });
-        console.log("Agent disconnected.");
+    });
+
+    call.on('error', (err) => {
+        console.error("!!! [STREAM ERROR]:", err);
     });
 }
 
-// 3. Start the Server
-function main() {
-    const server = new grpc.Server();
-    
-    // Link the 'MonitorService' from the .proto to our function
-    server.addService(monitorProto.MonitorService.service, {
-        streamMetrics: streamMetrics
-    });
+const server = new grpc.Server();
+server.addService(monitorProto.MonitorService.service, { streamMetrics });
 
-    const address = '0.0.0.0:50051';
-    server.bindAsync(address, grpc.ServerCredentials.createInsecure(), () => {
-        console.log(`Collector Server running at ${address}`);
-        server.start();
-    });
-}
-
-main();
+server.bindAsync('0.0.0.0:50051', grpc.ServerCredentials.createInsecure(), () => {
+    console.log("Collector running at 0.0.0.0:50051");
+    server.start();
+});

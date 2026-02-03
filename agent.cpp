@@ -1,49 +1,69 @@
 #include <iostream>
-#include <memory>
+#include <fstream>
 #include <string>
+#include <memory>
+#include <unistd.h>
 #include <grpcpp/grpcpp.h>
-#include "monitor.grpc.pb.h" // The file we generated!
+#include "monitor.grpc.pb.h"
 
 using grpc::Channel;
 using grpc::ClientContext;
-using grpc::Status;
+using grpc::ClientWriter;
 using monitor::MonitorService;
 using monitor::MetricReport;
 using monitor::Ack;
 
-class MonitorClient {
-public:
-    MonitorClient(std::shared_ptr<Channel> channel)
-        : stub_(MonitorService::NewStub(channel)) {}
+// Function to get CPU usage
+double get_cpu_usage() {
+    std::ifstream file("/proc/loadavg");
+    double load;
+    file >> load; // Simple version for testing
+    return load * 10.0; 
+}
 
-    // This function sends a single report to the server
-    void SendMetrics(double cpu, double mem) {
-        MetricReport report;
-        report.set_host_name("Kishor-PC");
-        report.set_cpu_usage(cpu);
-        report.set_mem_usage(mem);
-
-        Ack response;
-        ClientContext context;
-
-        // In the next step, we'll make this a real stream,
-        // but let's start with a simple call to test the connection.
-        // Status status = stub_->StreamMetrics(&context, &report, &response);
-        std::cout << "Packet Ready: CPU " << cpu << "% RAM " << mem << "%" << std::endl;
-    }
-
-private:
-    std::unique_ptr<MonitorService::Stub> stub_;
-};
+// Function to get Memory usage
+double get_mem_usage() {
+    std::string label;
+    long total, free;
+    std::ifstream file("/proc/meminfo");
+    file >> label >> total >> label;
+    file >> label >> free >> label;
+    return (1.0 - (double)free / total) * 100.0;
+}
 
 int main() {
-    // We'll tell the agent to look for the server on "localhost:50051"
-    MonitorClient client(grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()));
-    
-    std::cout << "Agent is running. Searching for server..." << std::endl;
-    
-    // For now, let's just print that we are ready to send
-    client.SendMetrics(15.5, 45.0); 
+    auto channel = grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials());
+    auto stub = MonitorService::NewStub(channel);
 
+    ClientContext context;
+    Ack ack;
+
+    // Open the pipe
+    std::unique_ptr<ClientWriter<MetricReport>> writer(stub->StreamMetrics(&context, &ack));
+
+    if (!writer) {
+        std::cout << "Failed to open stream!" << std::endl;
+        return 1;
+    }
+
+    std::cout << "Monitoring Active. Sending heartbeats..." << std::endl;
+
+    while (true) {
+        MetricReport report;
+        report.set_host_name("Kishor-PC");
+        report.set_cpu_usage(get_cpu_usage());
+        report.set_mem_usage(get_mem_usage());
+
+        if (!writer->Write(report)) {
+            std::cout << "Stream broken!" << std::endl;
+            break;
+        }
+
+        std::cout << ">>> Heartbeat sent to Collector..." << std::endl;
+        sleep(2); // Send every 2 seconds
+    }
+
+    writer->WritesDone();
+    writer->Finish();
     return 0;
 }
