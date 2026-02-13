@@ -49,19 +49,20 @@ int main() {
     std::cout << "Monitoring Active. Sending heartbeats..." << std::endl;
 
     while (true) {
-        MetricReport report;
-        report.set_host_name("Kishor-PC");
-        report.set_cpu_usage(get_cpu_usage());
-        report.set_mem_usage(get_mem_usage());
+    MetricReport report;
+    // CRITICAL: Ensure this matches the key you want in Redis
+    report.set_host_name("Kishor-PC"); 
+    report.set_cpu_usage(get_cpu_usage());
+    report.set_mem_usage(get_mem_usage());
 
-        if (!writer->Write(report)) {
-            std::cout << "Stream broken!" << std::endl;
-            break;
-        }
-
-        std::cout << ">>> Heartbeat sent to Collector..." << std::endl;
-        sleep(2); // Send every 2 seconds
+    if (!writer->Write(report)) {
+        std::cout << "Stream broken!" << std::endl;
+        break;
     }
+
+    std::cout << ">>> Heartbeat sent to Collector..." << std::endl;
+    sleep(2); 
+}
 
     writer->WritesDone();
     writer->Finish();

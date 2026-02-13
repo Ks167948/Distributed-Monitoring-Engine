@@ -14,16 +14,17 @@ async function streamMetrics(call, callback) {
 
     call.on('data', async (report) => {
         // FIX: Ensure we get a string even if host_name is missing or renamed
-        const host = report.host_name || report.hostname || "Unknown-Host";
-        
+        // console.log("Raw Report Object:", JSON.stringify(report));
+        const host = report.hostName || report.hostname || "Unknown-Host";
+
         console.log(`>>> [RECEIVE] Got packet from: ${host}`);
         
         try {
             const dataPoint = JSON.stringify({
-                cpu: report.cpu_usage,
-                mem: report.mem_usage,
-                time: new Date().toISOString()
-            });
+            cpu: report.cpuUsage || report.cpu_usage,
+            mem: report.memUsage || report.mem_usage,
+            time: new Date().toISOString()
+        });
 
             // Save to Redis using the resolved host variable
             const listSize = await redisClient.lPush(`metrics:${host}`, dataPoint);
