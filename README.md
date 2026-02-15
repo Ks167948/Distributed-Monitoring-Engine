@@ -74,7 +74,15 @@ Open a third terminal to visualize the data live:
 node dashboard.js
 ```
 ## 📸 Demo
-(Insert your screenshot of the dashboard table here)
+
+### Real-Time Dashboard
+![Dashboard View](demo_screenshots/dashbord_demo.png)
+
+### Agent Terminal
+![Terminal Logs](demo_screenshots/agent_demo.png)
+
+### Redis Terminal
+![Terminal Logs](demo_screenshots/redis_demo.png)
 
 ## 👨‍💻 Author
-Kishor Software Engineer | Backend Systems Enthusiast [[Link to your LinkedIn](https://www.linkedin.com/in/kishor-solanki-507514285/)]
+Kishor Solanki [LinkedIn](https://www.linkedin.com/in/kishor-solanki-507514285/)
